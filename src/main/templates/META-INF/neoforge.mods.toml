@@ -31,7 +31,7 @@ authors="zinzinc"
 
 # The description text for the mod (multi line!) (#mandatory)
 description='''
-Example mod description.
+Compatibility fixes for the ZinZinc modpack. Fixes missing Create Grappling Hooks partial models during initial resource loading.
 '''
 
 # The [[mixins]] block allows you to declare your mixin config to FML so that it gets loaded.
