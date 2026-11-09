@@ -31,12 +31,12 @@ authors="zinzinc"
 
 # The description text for the mod (multi line!) (#mandatory)
 description='''
-Compatibility fixes for the ZinZinc modpack. Fixes missing Create Grappling Hooks partial models during initial resource loading.
+Compatibility fixes for the ZinZinc modpack. Fixes Create Grappling Hooks model loading and Wakes accessing its client config before it is loaded.
 '''
 
 # The [[mixins]] block allows you to declare your mixin config to FML so that it gets loaded.
-#[[mixins]]
-#config="${mod_id}.mixins.json"
+[[mixins]]
+config="${mod_id}.mixins.json"
 
 # The [[accessTransformers]] block allows you to declare where your AT file is.
 # If this block is omitted, a fallback attempt will be made to load an AT from META-INF/accesstransformer.cfg

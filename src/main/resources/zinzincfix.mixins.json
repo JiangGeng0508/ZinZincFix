@@ -1,0 +1,12 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.zinzinc.chorefix.mixin.client",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "wakes.WakeClientTickerMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
