@@ -4,7 +4,10 @@
   "package": "com.zinzinc.chorefix.mixin.client",
   "compatibilityLevel": "JAVA_21",
   "client": [
-    "wakes.WakeClientTickerMixin"
+    "wakes.WakeClientTickerMixin",
+    "alivecombat.PassHandlerMixin",
+    "subtleeffects.FireflyManagerMixin",
+    "subtleeffects.BiomeEffectsManagerMixin"
   ],
   "injectors": {
     "defaultRequire": 1

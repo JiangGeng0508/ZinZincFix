@@ -1,0 +1,39 @@
+// --no-configuration-cache -I tests/performance/smoke.gradle
+// -PperformanceMods=/path/to/mods runClient (or -PperformanceAbsent runClient/runServer)
+allprojects {
+    afterEvaluate {
+        def absent = providers.gradleProperty('performanceAbsent').isPresent()
+        def testSourceSet = sourceSets.create('performanceSmoke') {
+            java.srcDir('tests/performance/src')
+            resources.srcDir('tests/performance/resources')
+            compileClasspath += sourceSets.main.compileClasspath + sourceSets.main.output
+            runtimeClasspath = output + configurations.runtimeClasspath
+        }
+        def targets = [:]
+        if (!absent) {
+            def mods = file(providers.gradleProperty('performanceMods').get())
+            ['alive': 'alivecombat-*.jar', 'subtle': 'SubtleEffects-*.jar',
+             'fzzy': 'fzzy_config*.jar', 'kotlin': 'kotlinforforge-*-all.jar'].each { name, pattern ->
+                def candidates = fileTree(mods) { include pattern }.files
+                if (candidates.size() != 1) throw new GradleException("Expected one ${pattern} in ${mods}")
+                targets[name] = candidates.first()
+            }
+            dependencies.add('localRuntime', files(targets.values()))
+        }
+        neoForge.mods.remove(neoForge.mods.getByName('zinzincfix'))
+        dependencies.add('localRuntime', files(tasks.named('jar')))
+        neoForge.mods {
+            performance_smoke { sourceSet(testSourceSet) }
+        }
+        ['client', 'server'].each { name ->
+            neoForge.runs.named(name) {
+                sourceSet = testSourceSet
+                gameDirectory = file("build/performance-smoke/${absent ? 'absent' : 'present'}-${name}")
+                systemProperty 'mixin.debug.export', 'true'
+                systemProperty 'mixin.debug.countInjections', 'true'
+                systemProperty 'performance.absent', absent.toString()
+                targets.each { key, value -> systemProperty "performance.${key}Jar", value.absolutePath }
+            }
+        }
+    }
+}

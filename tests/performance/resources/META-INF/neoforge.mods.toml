@@ -1,0 +1,7 @@
+modLoader="javafml"
+loaderVersion="[4,)"
+license="All Rights Reserved"
+[[mods]]
+modId="performance_smoke"
+version="1"
+displayName="AliveCombat and Subtle Effects regression verification"

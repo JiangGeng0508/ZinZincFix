@@ -31,7 +31,7 @@ authors="zinzinc"
 
 # The description text for the mod (multi line!) (#mandatory)
 description='''
-Compatibility fixes for the ZinZinc modpack. Fixes Create Grappling Hooks model loading and Wakes accessing its client config before it is loaded.
+Compatibility fixes for the ZinZinc modpack. Fixes Create Grappling Hooks model loading and Wakes accessing its client config before it is loaded. Caches AliveCombat interaction method checks and reduces redundant Subtle Effects biome queries.
 '''
 
 # The [[mixins]] block allows you to declare your mixin config to FML so that it gets loaded.
