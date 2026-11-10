@@ -1,0 +1,38 @@
+// Run with --no-configuration-cache -I tests/coasters/smoke.gradle runServer
+// and -PcoastersJar=/path/to/simulatedcoasters-0.1.5.jar (or -PcoastersAbsent).
+allprojects {
+    afterEvaluate {
+        def absent = providers.gradleProperty('coastersAbsent').isPresent()
+        def testSourceSet = sourceSets.create(absent ? 'coastersAbsent' : 'coastersSmoke') {
+            java.srcDir('tests/coasters/src')
+            resources.srcDir('tests/coasters/resources')
+            compileClasspath += sourceSets.main.compileClasspath
+            runtimeClasspath = output + configurations.runtimeClasspath
+        }
+        if (!absent) {
+            def coastersJar = file(providers.gradleProperty('coastersJar').get())
+            if (!coastersJar.isFile()) throw new GradleException("Missing Simulated Coasters JAR: ${coastersJar}")
+            // Exercise the original scan bytecode, with small plot/holder adapters
+            // instead of starting the full Sable/Create stack or a player world.
+            tasks.named(testSourceSet.processResourcesTaskName) {
+                from(zipTree(coastersJar)) {
+                    include 'dev/silvergold/simulatedcoasters/track/cart/CoasterCartPlotScan.class'
+                    include 'dev/silvergold/simulatedcoasters/track/cart/CoasterCartPlotScan$BearingScanResult.class'
+                }
+            }
+        }
+        // Test the distributable JAR rather than only the development classes.
+        neoForge.mods.remove(neoForge.mods.getByName('zinzincfix'))
+        dependencies.add('localRuntime', files(tasks.named('jar')))
+        neoForge.mods {
+            coasters_smoke { sourceSet(testSourceSet) }
+        }
+        neoForge.runs.server {
+            sourceSet = testSourceSet
+            gameDirectory = file(absent ? 'build/coasters-smoke/absent' : 'build/coasters-smoke/present')
+            systemProperty 'mixin.debug.export', 'true'
+            systemProperty 'mixin.debug.countInjections', 'true'
+            systemProperty 'coasters.absent', absent.toString()
+        }
+    }
+}

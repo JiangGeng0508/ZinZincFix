@@ -1,0 +1,7 @@
+modLoader="javafml"
+loaderVersion="[4,)"
+license="All Rights Reserved"
+[[mods]]
+modId="coasters_smoke"
+version="1"
+displayName="Coasters scan regression verification"

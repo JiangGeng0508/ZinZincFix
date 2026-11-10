@@ -28,6 +28,46 @@ addon_gancho:item/plunger_launcher/spool_joint
 
 补丁仅在 `WakesConfig.CLIENT_SPEC.isLoaded()` 为假时跳过 Wakes 的客户端 tick；配置就绪后继续执行原始逻辑，包括进入世界时初始化水波、退出世界时清理实例。Mixin 仅在客户端应用，未安装 Wakes 时自动跳过。
 
+## Northstar / Spelunkery 冰块兼容修复
+
+针对 `crash-2026-11-10_09.28.47-client.txt` 中的启动崩溃，涉及 Northstar 0.6.6+1.21.1 和 Spelunkery 1.21.1-0.4.4。
+
+Spelunkery 的 `IceMixin` 以优先级 1000 替换了 `IceBlock.melt()`；Northstar 的 `IceBlockMixin` 同样使用优先级 1000，向其中的 `DimensionType.ultraWarm()` 调用注入温度判断。Mixin 不允许此类注入修改相同或更高优先级的其他 Mixin 合并方法，因此在游戏 Bootstrap 阶段抛出 `InvalidInjectionException`。Northstar 配置中的 `priority: 1200` 只控制配置顺序，不是 Mixin 类的优先级。
+
+补丁通过 NeoForge 自带的 Coremod，在 Mixin 读取 Northstar 的 `IceBlockMixin` 前，将该类默认的 1000 优先级调整为 1100。保留 Northstar 的温度、密封和破冰逻辑，以及 Spelunkery 的盐块融冰逻辑；无需新增前置，也不修改原模组 JAR。若该类已有非 1000 的显式优先级，则保持不变。
+
+此修复适用于客户端和服务端。未安装 Northstar 时没有转换目标；单独安装 Northstar 时也只调整此类的优先级。
+
+## Xaero 玩家位置模组依赖版本修复
+
+针对 `crash-2026-11-10_10.31.14-fml.txt`：`xaeros_playerposition` 1.0.0 将小地图的可选依赖版本锁定为 `[26.4.2]`，而整合包使用 26.6.0。可选依赖在已安装时仍需满足版本要求，因此 NeoForge 在加载模组前就会终止启动。XaeroPlus 2.37.2 同时要求小地图 26.6.0，单独降级小地图会产生新的版本冲突。
+
+此问题通过整合包客户端的 `config/fml.toml` 修复。在原配置中，将空的 `dependencyOverrides = {}` 替换为：
+
+```toml
+dependencyOverrides = { xaeros_playerposition = ["-xaerominimap", "+xaerominimap"] }
+```
+
+`-xaerominimap` 解除玩家位置模组对小地图的依赖约束，`+xaerominimap` 保持它在小地图之后加载。若已有其他依赖覆盖，应合并此条目并保留原配置；修改前备份文件，修改后重启游戏。
+
+该配置独立于 ZinZincFix JAR，必须随整合包的 `config/fml.toml` 分发；仅更新补丁 JAR 不会修复这次加载错误。配置不会限定小地图版本，当前验证范围是玩家位置 1.0.0、小地图 26.6.0、世界地图 1.47.0、XaeroPlus 2.37.2；升级这些模组后需重新检查是否仍需此覆盖。
+
+已使用上述四个原始 JAR，在 Minecraft 1.21.1 / NeoForge 21.1.265 的隔离客户端中通过加载测试，并检查小地图边框、玩家追踪和世界地图的 Mixin 已应用，玩家追踪反射接口初始化成功。完整整合包及多人游戏中的头像显示仍需游戏内复测。
+
+## Simulated Coasters 船体扫描优化
+
+针对 Simulated Coasters 0.1.5 / Sable 2.0.6 的持续 tick 热点：`CoasterCartPlotScan.scanBearingCells()` 在物理回调中扫描船体的每个非空区段，每个区段逐个检查 4096 个方块，即使整个区段都没有目标 bearing 或 rivet。
+
+补丁在 `scanBearingCells()` 和 `forEachBearingWorldCell()` 的区段过滤处增加 Minecraft 自带的 `LevelChunkSection.maybeHas()` 检查，先查询区段的方块状态 palette；确认不含目标方块时跳过整个区段。可能含有目标时继续执行原扫描，保留数量、代表位置、结果顺序以及回调行为。
+
+每次都检查当前 palette，不跨 tick 缓存结果，因此无需为放置、拆除、组装、区块替换添加缓存失效钩子。palette 可能保留已被移除的状态，此时只会多做一次原扫描，不会漏掉新放置的目标。若目标遍布所有区段或 palette 保留大量旧状态，收益会降低。
+
+此 Mixin 适用于客户端与服务端，未安装 Simulated Coasters 时自动跳过；无需新增前置，不修改原模组 JAR。当前目标为 0.1.5，升级 Simulated Coasters 后需要重新验证注入位置。
+
+已用 0.1.5 JAR 中的原始扫描字节码、真实 Minecraft 区段 / palette，在 NeoForge 21.1.265 中对发布 JAR 做对照测试：覆盖空区段、负坐标、多区块、多种目标状态、即时增删、旧 palette 条目、全局 palette、区段替换、32 组随机布局和回调内修改。测试使用轻量 plot / holder 适配器，不依赖完整 Sable 世界。128 个非空区段中只有 1 个含目标的场景，两种扫描入口的方块读取均从 **524,288 次降至 4,096 次（减少 99.22%）**；这是该测试场景的读取量变化，不是整合包 FPS / MSPT 收益。完整整合包和实际船体仍需游戏内复测。
+
+复现命令与测试范围见 [扫描回归测试](tests/coasters/README.md)。
+
 ## AliveCombat 交互方法查询优化
 
 针对 AliveCombat 1.6.0 的 `PassHandler.declaresMethod()`：准星拾取和交互判断会反复沿继承链反射查找方法，未找到时逐层创建 `NoSuchMethodException`。
@@ -55,7 +95,7 @@ addon_gancho:item/plunger_launcher/spool_joint
 .\gradlew.bat build
 ```
 
-将 `build/libs/zinzincfix-1.0.4.jar` 放入整合包客户端的 `mods` 文件夹，替换旧版 ZinZincFix，然后重启游戏。目录中只保留一个 ZinZincFix 版本。此版本包含上述兼容修复与性能补丁，AliveCombat 与 Subtle Effects 的优化仅在客户端应用。
+将 `build/libs/zinzincfix-1.0.4.jar` 放入整合包的 `mods` 文件夹，替换旧版 ZinZincFix，然后重启游戏。目录中只保留一个 ZinZincFix 版本。此版本包含上述兼容修复与性能补丁；使用 Northstar / Spelunkery 或 Simulated Coasters 的专用服务端也应安装此补丁，AliveCombat 与 Subtle Effects 的优化仅在客户端应用。
 
 ## 游戏内复测
 
@@ -63,5 +103,7 @@ addon_gancho:item/plunger_launcher/spool_joint
 2. 检查快捷栏、背包、主副手和第三人称下的发射器模型，并检查同样使用这些模型的 `addon_gancho:grapple_swing`。
 3. 使用 `F3+T` 重载资源，再次检查以上物品。
 4. 检查启动过程不再出现 Wakes 配置未加载异常；进入世界游泳或划船，确认水波效果正常，退出并重新进入世界后再次检查。
-5. 检查 AliveCombat 准星拾取、穿过无碰撞方块的攻击、可交互方块及主副手工具的交互判断，与原版行为一致。
-6. 在白天、夜晚、洞穴及有方块光源的位置检查萤火虫，在花林等群系检查粒子；切换配置、世界与维度后再次确认，并用相同路线录制帧时间与 JFR 分配采样。
+5. 同时安装 Northstar 和 Spelunkery 启动，确认不再出现 `IceBlockMixin` 的优先级冲突；检查盐块相邻冰块的融化，以及 Northstar 高温环境和密封区域中的冰块融化、破坏行为。
+6. 使用相同船体、实体数量与位置，对比 Simulated Coasters 的 tick 耗时；检查 coaster cart / rivet 的放置、拆除、重复限制、组装和解体行为，确认不会漏检目标方块。
+7. 检查 AliveCombat 准星拾取、穿过无碰撞方块的攻击、可交互方块及主副手工具的交互判断，与原版行为一致。
+8. 在白天、夜晚、洞穴及有方块光源的位置检查萤火虫，在花林等群系检查粒子；切换配置、世界与维度后再次确认，并用相同路线录制帧时间与 JFR 分配采样。

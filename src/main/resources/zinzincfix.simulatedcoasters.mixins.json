@@ -1,0 +1,12 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.zinzinc.chorefix.mixin.simulatedcoasters",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "CoasterCartPlotScanMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

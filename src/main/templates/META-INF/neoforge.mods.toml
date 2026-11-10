@@ -31,12 +31,15 @@ authors="zinzinc"
 
 # The description text for the mod (multi line!) (#mandatory)
 description='''
-Compatibility fixes for the ZinZinc modpack. Fixes Create Grappling Hooks model loading and Wakes accessing its client config before it is loaded. Caches AliveCombat interaction method checks and reduces redundant Subtle Effects biome queries.
+Compatibility fixes for the ZinZinc modpack. Fixes Create Grappling Hooks model loading, Wakes accessing its client config before it is loaded, and the Northstar/Spelunkery ice mixin conflict. Skips irrelevant chunk sections during Simulated Coasters bearing scans. Caches AliveCombat interaction method checks and reduces redundant Subtle Effects biome queries.
 '''
 
 # The [[mixins]] block allows you to declare your mixin config to FML so that it gets loaded.
 [[mixins]]
 config="${mod_id}.mixins.json"
+
+[[mixins]]
+config="${mod_id}.simulatedcoasters.mixins.json"
 
 # The [[accessTransformers]] block allows you to declare where your AT file is.
 # If this block is omitted, a fallback attempt will be made to load an AT from META-INF/accesstransformer.cfg
