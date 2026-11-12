@@ -6,11 +6,21 @@
 .\gradlew.bat --no-configuration-cache -I tests/overrides/smoke.gradle '-PoverrideMods=E:\App\PCL\.minecraft\versions\Aeronautics\mods' -PoverrideMode=both runClient
 ```
 
+1.0.8 起，fixture 从原模组 JSON 保留 `overwrites`、`injectors` 等策略，仅裁剪无关 Mixin 和依赖完整模组的 plugin / refmap。之前的 fixture 重新生成了精简配置，遗漏 Fluid Logistics 的 `overwrites.requireAnnotations=true`，因此 1.0.7 的测试无法发现其严格覆盖异常。
+
+用旧发布 JAR 复现本次启动错误（此命令预期失败，不是修复版通过测试）：
+
+```powershell
+.\gradlew.bat --no-configuration-cache -I tests/overrides/smoke.gradle '-PoverrideMods=E:\App\PCL\.minecraft\versions\Aeronautics\mods' -PoverrideMode=both '-PoverridePatch=完整路径/zinzincfix-1.0.7.jar' runClient
+```
+
+已复现 `FactoryGaugeHostBlockMixin ... @Overwrite is required by the parent configuration`。1.0.8 为该取物方法增加 `@Overwrite(remap=false)`，原始方法指令和严格检查均保留。测试现在在构造期主动加载目标类，若 Mixin 失败则立即退出，避免停留在错误界面。
+
 模式：
 
 | 模式 | 注入来源 | 预期 |
 |---|---|---|
-| baseline | 四个模组，不加载 ZinZincFix | 复现自定义面板变普通仪表、Moonlight 图标零次更新 |
+| baseline | 四个模组，不加载 ZinZincFix | 检查原始严格配置下的冲突；此前宽松 fixture 的功能覆盖基线仅保留为历史结果 |
 | both | 四个模组 + 发布 JAR | 两处功能同时保留 |
 | left | Deployer、Moonlight + 发布 JAR | 两个继承方法的转发入口有效 |
 | right | Fluid Logistics、Supplementaries + 发布 JAR | 原有行为不变 |
@@ -24,6 +34,8 @@ Create 注册对象、面板数据、面板槽位定位和 Registrate 条目使�
 
 取物检查包括：同板四槽位、自定义/资源/普通/空面板、16 次即时激活切换、面板替换、未注册资源类型、非仪表状态、缺少方块实体，以及回退调用次数。制图台检查无自定义图标时的条件、注册自定义图标后连续 80 次更新、运行中新增图标、双方图标列表和父类 tick 恰好一次。
 
-2026-11-12 的 1.0.7 验证结果：baseline 复现两处错误；修复后的四种客户端组合共 194 项行为断言，四种服务端组合共 168 项取物断言通过。已有思索双模组回归的 124 项数值断言通过。没有目标模组的客户端/服务端另按 `tests/ponder` 的 absent 模式检查。
+2026-11-12 的 1.0.7 历史验证结果（fixture 未保留严格覆盖策略）：baseline 复现两处功能覆盖；修复后的四种客户端组合共 194 项行为断言，四种服务端组合共 168 项取物断言通过。已有思索双模组回归的 124 项数值断言通过。
+
+1.0.8 使用修正后的原始策略，both / left / right 的客户端及服务端组合通过；both 客户端为 42 项取物 + 11 项制图台断言，服务端为 42 项取物断言。客户端与服务端没有任何目标模组时另使用 `tests/configload` 的 `configAbsent` 模式验证发布 JAR 可加载。本次日志为 `build/override-smoke/strict-old.log`、`strict-fixed-{both,left,right}.log`，以及 `build/config-smoke/cardboard-{present,failure,absent}.log`。
 
 测试日志在 `build/override-smoke/*.log`。此验证不覆盖 Create 的实际槽位几何、完整资源包显示、真实玩家输入和服务器网络取物流程；安装后仍需在整合包中复测。Windows 测试只终止自己的临时无世界进程，避免环境中已知的原生图形卸载问题；不验证正常退出流程，也不会终止用户游戏。

@@ -1,5 +1,6 @@
 import org.objectweb.asm.*;
 import org.objectweb.asm.tree.*;
+import com.google.gson.*;
 import java.nio.file.*;
 import java.util.*;
 import java.util.zip.*;
@@ -23,9 +24,15 @@ public class PrepareFixtures {
         }
         to.putNextEntry(new ZipEntry(entry)); to.write(bytes); to.closeEntry();
     }
-    static void config(Path path, String pkg, String list, String side) throws Exception {
-        Files.writeString(path, "{\"required\":true,\"minVersion\":\"0.8\",\"package\":\"" + pkg +
-                "\",\"compatibilityLevel\":\"JAVA_21\",\"" + side + "\":[" + list + "],\"injectors\":{\"defaultRequire\":1}}");
+    static void config(Path path, ZipFile original, String list, String side) throws Exception {
+        var entry = original.getEntry(path.getFileName().toString());
+        var config = JsonParser.parseString(new String(original.getInputStream(entry).readAllBytes(),
+                java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
+        // Retain original overwrite/injector policies. Only unrelated mixins and
+        // plugins requiring the entire mod are excluded from these narrow fixtures.
+        for (String key : List.of("mixins", "client", "server", "plugin", "refmap")) config.remove(key);
+        config.add(side, JsonParser.parseString("[" + list + "]"));
+        Files.writeString(path, config.toString());
     }
     public static void main(String[] args) throws Exception {
         Path mods = Path.of(args[0]), out = Path.of(args[1]), resources = out.resolve("resources");
@@ -51,11 +58,11 @@ public class PrepareFixtures {
             copy(fluid, jar, "com.yision.fluidlogistics.content.logistics.factoryGauge.FactoryGaugeDropPolicy", null);
             copy(moonlight, jar, "net.mehvahdjukaar.moonlight.api.util.CartographyTableHelper", null);
             copy(moonlight, jar, "net.mehvahdjukaar.moonlight.api.util.CartographyTableHelper$SlotExtras", null);
+            config(resources.resolve("deployer.mixins.json"), deployer, left ? "\"FactoryPanelBlockMixin\"" : "", "mixins");
+            config(resources.resolve("fluidlogistics.mixins.json"), fluid, right ? "\"logistics.FactoryGaugeHostBlockMixin\"" : "", "mixins");
+            config(resources.resolve("moonlight-common.mixins.json"), moonlight, left ? "\"CartographyTableScreenMixin\"" : "", "client");
+            config(resources.resolve("supplementaries-common.mixins.json"), supplementaries, right ? "\"CartographyTableScreenMixin\"" : "", "client");
         }
-        config(resources.resolve("deployer.mixins.json"), "net.liukrast.deployer.lib.mixin", left ? "\"FactoryPanelBlockMixin\"" : "", "mixins");
-        config(resources.resolve("fluidlogistics.mixins.json"), "com.yision.fluidlogistics.mixin", right ? "\"logistics.FactoryGaugeHostBlockMixin\"" : "", "mixins");
-        config(resources.resolve("moonlight-common.mixins.json"), "net.mehvahdjukaar.moonlight.core.mixins", left ? "\"CartographyTableScreenMixin\"" : "", "client");
-        config(resources.resolve("supplementaries-common.mixins.json"), "net.mehvahdjukaar.supplementaries.mixins", right ? "\"CartographyTableScreenMixin\"" : "", "client");
         System.out.println("Prepared original override fixtures: " + args[2]);
     }
 }

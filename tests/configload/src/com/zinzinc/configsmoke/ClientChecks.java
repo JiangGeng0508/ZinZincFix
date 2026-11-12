@@ -3,6 +3,11 @@ package com.zinzinc.configsmoke;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.TitleScreen;
+import net.minecraft.client.resources.sounds.SimpleSoundInstance;
+import net.minecraft.client.resources.sounds.SoundInstance;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.util.RandomSource;
 import net.minecraft.network.chat.Component;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.fml.ModLoader;
@@ -10,6 +15,7 @@ import net.neoforged.fml.config.IConfigSpec;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.client.event.InputEvent;
 import net.neoforged.neoforge.client.event.ScreenEvent;
+import net.neoforged.neoforge.client.event.sound.PlaySoundEvent;
 import net.neoforged.neoforge.client.loading.ClientModLoader;
 import net.neoforged.neoforge.client.gui.LoadingErrorScreen;
 import net.neoforged.neoforge.common.ModConfigSpec;
@@ -27,6 +33,7 @@ public final class ClientChecks {
     static final String CORO = "com.corosus.modconfig.CoroConfigRegistry";
     static final String CURIOS = "top.theillusivec4.curios.client.gui.GuiEventHandler";
     static final String DEV_INFO = "com.endertech.minecraft.forge.client.DevInfo";
+    static final String CARDBOARD = "net.chaolux.createcardboardthings.client.sound.CardboardJukeboxEvents";
     static int checks, ticks;
     static boolean ran;
 
@@ -57,6 +64,38 @@ public final class ClientChecks {
         return (ModConfigSpec) target("squeek.appleskin.ModConfig").getField("SPEC").get(null);
     }
 
+    static ModConfigSpec cardboardSpec() throws Exception {
+        return (ModConfigSpec) field(target("net.chaolux.createcardboardthings.Config"), "SPEC").get(null);
+    }
+
+    static void cardboardSounds(boolean unloaded) throws Exception {
+        var patched = target(CARDBOARD);
+        var original = new OriginalLoader().loadClass(CARDBOARD);
+        check(Arrays.stream(patched.getDeclaredMethods()).anyMatch(m -> m.getName().contains("zinzincfix$waitForCommonConfig")),
+                "Missing cardboard sound guard");
+        for (SoundSource source : List.of(SoundSource.MUSIC, SoundSource.RECORDS, SoundSource.MASTER)) {
+            SoundInstance sound = new SimpleSoundInstance(ResourceLocation.parse("minecraft:music.menu"), source,
+                    1.0f, 1.0f, RandomSource.create(), false, 0, SoundInstance.Attenuation.NONE, 0, 0, 0, true);
+            var event = new PlaySoundEvent(null, sound);
+            patched.getMethod("onPlaySound", PlaySoundEvent.class).invoke(null, event);
+            check(event.getSound() == sound, "Out-of-world sound was replaced/cancelled");
+            if (unloaded) {
+                try {
+                    original.getMethod("onPlaySound", PlaySoundEvent.class).invoke(null, new PlaySoundEvent(null, sound));
+                    throw new AssertionError("Original cardboard callback did not reproduce early config read");
+                } catch (InvocationTargetException expected) {
+                    check(expected.getCause() instanceof IllegalStateException
+                            && expected.getCause().getMessage().contains("before config is loaded"), "Unexpected cardboard baseline failure");
+                }
+            } else {
+                var baseline = new PlaySoundEvent(null, sound);
+                original.getMethod("onPlaySound", PlaySoundEvent.class).invoke(null, baseline);
+                check(baseline.getSound() == event.getSound(), "Loaded cardboard sound differs from original");
+            }
+        }
+        check(((Map<?, ?>) field(patched, "MAP").get(null)).isEmpty(), "Menu sound modified jukebox state");
+    }
+
     static Object coro() throws Exception { return target(CORO).getMethod("instance").invoke(null); }
 
     static boolean needsCoroInit() throws Exception { return target(CORO).getField("needsInitialConfigRegistration").getBoolean(coro()); }
@@ -70,6 +109,8 @@ public final class ClientChecks {
             check(Arrays.stream(target(name).getDeclaredMethods()).anyMatch(m -> m.getName().contains("zinzincfix$waitFor")), "Missing mixin: " + name);
         }
         unloadedInputs();
+        check(!cardboardSpec().isLoaded(), "Expected unloaded cardboard COMMON config");
+        cardboardSounds(true);
         screenAndKeyGuards(true);
         check(needsCoroInit(), "CoroUtil should still need initial synchronization");
         callCoro();
@@ -99,13 +140,19 @@ public final class ClientChecks {
         check(before == field(hud, "unclampedFlashAlpha").getFloat(null), "Unloaded AppleSkin advanced animation");
     }
 
-    public static void register() {
+    public static void register() throws Exception {
+        NeoForge.EVENT_BUS.register(target(CARDBOARD));
         NeoForge.EVENT_BUS.addListener(EventPriority.LOWEST, (ClientTickEvent.Post event) -> {
             if (ran) return;
             try {
                 if (Boolean.getBoolean("configSmoke.failure")) {
                     check(ModLoader.hasErrors(), "Expected registry failure");
                     check(needsCoroInit(), "Failure tick consumed CoroUtil initialization");
+                    SoundInstance sound = new SimpleSoundInstance(ResourceLocation.parse("minecraft:music.menu"), SoundSource.MUSIC,
+                            1.0f, 1.0f, RandomSource.create(), false, 0, SoundInstance.Attenuation.NONE, 0, 0, 0, true);
+                    var soundEvent = new PlaySoundEvent(null, sound);
+                    NeoForge.EVENT_BUS.post(soundEvent);
+                    check(soundEvent.getSound() == sound, "Loading-error menu music changed");
                     if (++ticks >= 5) {
                         check(!taczSpec().isLoaded() && !appleSpec().isLoaded(), "Registry failure should precede config loading");
                         System.out.println("CONFIG FAILURE PASS: loading error screen reached; five event-bus tick posts after registry rollback without secondary config errors");
@@ -188,6 +235,14 @@ public final class ClientChecks {
         } finally { loading.setBoolean(null, savedLoading); }
         screenAndKeyGuards(false);
         check(Minecraft.getInstance().player == null, "Test must not enter a world");
+        var jukebox = (ModConfigSpec.BooleanValue) field(target("net.chaolux.createcardboardthings.Config"), "CARDBOARD_JUKEBOX").get(null);
+        boolean savedJukebox = jukebox.get();
+        try {
+            for (boolean enabled : new boolean[]{false, true}) {
+                jukebox.set(enabled);
+                cardboardSounds(false);
+            }
+        } finally { jukebox.set(savedJukebox); }
         loadedInputs();
         var originalHud = new OriginalLoader().loadClass(HUD);
         var patchedHud = target(HUD);
@@ -205,14 +260,15 @@ public final class ClientChecks {
                 }
             }
         } finally { alpha.set(savedAlpha); }
-        for (ModConfigSpec spec : List.of(taczSpec(), appleSpec())) {
+        for (ModConfigSpec spec : List.of(taczSpec(), appleSpec(), cardboardSpec())) {
             // Detach/reattach the real loaded configuration without changing files.
             var saved = field(ModConfigSpec.class, "loadedConfig").get(spec);
             try {
                 spec.acceptConfig(null);
                 if (spec == taczSpec()) {
                     invokeTick(target(CRAWL), "onCrawlHoldingInput"); invokeTick(target(AIM), "onAimHoldingPreInput");
-                } else invokeTick(target(HUD), "onClientTick");
+                } else if (spec == cardboardSpec()) cardboardSounds(true);
+                else invokeTick(target(HUD), "onClientTick");
                 check(!spec.isLoaded(), "Patch must not load configuration itself");
             } finally { spec.acceptConfig((IConfigSpec.ILoadedConfig) saved); }
             check(spec.isLoaded(), "Config did not resume after reattachment");
@@ -243,11 +299,11 @@ public final class ClientChecks {
     static final class OriginalLoader extends ClassLoader {
         OriginalLoader() { super(ClientChecks.class.getClassLoader()); }
         @Override protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
-            if (!List.of(CRAWL, AIM, HUD, CURIOS, DEV_INFO).contains(name)
+            if (!List.of(CRAWL, AIM, HUD, CURIOS, DEV_INFO, CARDBOARD).contains(name)
                     && !name.startsWith(HUD + "$") && !name.startsWith(DEV_INFO + "$")) return super.loadClass(name, resolve);
             var loaded = findLoadedClass(name);
             if (loaded == null) {
-                String mod = name.startsWith(HUD) ? "appleskin" : name.startsWith(CURIOS) ? "curios"
+                String mod = name.equals(CARDBOARD) ? "cardboard" : name.startsWith(HUD) ? "appleskin" : name.startsWith(CURIOS) ? "curios"
                         : name.startsWith(DEV_INFO) ? "forgeendertech" : "tacz";
                 String jar = System.getProperty("configSmoke." + mod + "Jar");
                 try (var zip = new ZipFile(Path.of(jar).toFile())) {

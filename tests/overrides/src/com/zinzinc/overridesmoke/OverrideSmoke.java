@@ -13,6 +13,10 @@ import com.simibubi.create.AllBlocks;
 @Mod("override_smoke")
 public class OverrideSmoke {
     public OverrideSmoke(IEventBus bus) {
+        // Fail promptly on a Mixin regression instead of leaving a loading-error
+        // screen open in this disposable test client.
+        try { Class.forName("com.simibubi.create.content.logistics.factoryBoard.FactoryPanelBlock"); }
+        catch (Throwable failure) { failure.printStackTrace(); finish(1); }
         bus.addListener((RegisterEvent event) -> {
             if (event.getRegistryKey().equals(Registries.BLOCK))
                 event.register(Registries.BLOCK, ResourceLocation.parse("override_smoke:panel"), () -> AllBlocks.TEST_BLOCK);

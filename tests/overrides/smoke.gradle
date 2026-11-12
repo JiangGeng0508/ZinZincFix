@@ -31,7 +31,9 @@ allprojects {
             from({ zipTree(new File(fixtures, 'fixture.jar')) }) { include '**/*.class' }
         }
         neoForge.mods.remove(neoForge.mods.getByName('zinzincfix'))
-        if (mode != 'baseline') dependencies.add('localRuntime', files(tasks.named('jar')))
+        if (mode != 'baseline') dependencies.add('localRuntime',
+            providers.gradleProperty('overridePatch').isPresent()
+                ? files(providers.gradleProperty('overridePatch').get()) : files(tasks.named('jar')))
         neoForge.mods { override_smoke { sourceSet(checks) } }
         ['client', 'server'].each { name ->
             neoForge.runs.named(name) {

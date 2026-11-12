@@ -52,6 +52,19 @@ allprojects {
             }
             dependencies.add('localRuntime', files(targets.findAll { key, value -> key != 'curios' }.values()))
             dependencies.add('localRuntime', files(prepareCurios))
+            def cardboardCandidates = fileTree(mods) { include 'createcardboardthings-*.jar' }.files
+            if (cardboardCandidates.size() != 1) throw new GradleException('Expected one CreateCardboardThings JAR')
+            targets.cardboard = cardboardCandidates.first()
+            // Keep original config and sound bytecode in the test module; their
+            // world/block paths are not invoked, so full Create registration is unnecessary.
+            def cardboardClasses = tasks.register('prepareConfigSmokeCardboard', Copy) {
+                from(zipTree(targets.cardboard)) {
+                    include 'net/chaolux/createcardboardthings/Config*.class'
+                    include 'net/chaolux/createcardboardthings/client/sound/*.class'
+                }
+                into(layout.buildDirectory.dir('config-smoke/fixtures/cardboard-classes'))
+            }
+            tasks.named(checks.processResourcesTaskName) { from(cardboardClasses) }
         }
         neoForge.mods.remove(neoForge.mods.getByName('zinzincfix'))
         dependencies.add('localRuntime', files(tasks.named('jar')))

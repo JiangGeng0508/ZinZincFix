@@ -44,6 +44,17 @@ addon_gancho:item/plunger_launcher/spool_joint
 
 已扫描整合包的 352 个顶层 JAR 及内嵌依赖（总计 590 个 JAR），并复核 tick、界面、输入和静态初始化候选。结果和仍需关注的路径见 [配置加载排查报告](docs/config-loading-audit-2026-11-12.zh-CN.md)，实际字节码对照测试及验证边界见 [配置生命周期测试](tests/configload/README.md)。
 
+## 18:15 启动失败与纸板唱片机配置修复
+
+1.0.8 针对 `crash-2026-11-12_18.15.46-client.txt` 修复两个已复现的问题：
+
+- 原始启动失败：1.0.7 为 `FactoryPanelBlock` 添加了继承方法转发入口，Fluid Logistics 1.3.2 的 `getCloneItemStack` 因此成为实际覆盖方法，但没有其 Mixin 配置要求的 `@Overwrite` 注解。Coremod 为这一个方法补齐注解，保留方法字节码和严格检查，同时保留 Deployer 的自定义取物注入。客户端与服务端都应用。
+- 后续客户端崩溃：CreateCardboardThings 1.21.1-1.0.2 在每次播放声音时先读取 COMMON 配置，包括菜单音乐；配置尚未加载时就会崩溃。补丁在其 `onPlaySound` 入口检查 `Config.SPEC.isLoaded()`，未就绪时暂缓该模组处理，声音事件原样继续；加载后恢复原唱片机逻辑，退出世界时的清理不受影响。未安装该模组时自动跳过。
+
+同次日志中 WATUT 的 `minecraft:shaders/core/particle.json` 缺失发生在模组构造失败后、资源恢复到 vanilla 的阶段，不能据此判断原模组资源缺失。本次未修改 WATUT 或资源包；完整整合包重新启动后仍需确认资源加载成功。
+
+保留原始严格覆盖设置的测试已复现 1.0.7 的异常，1.0.8 通过组合及单模组测试。配置测试覆盖原始唱片机回调的异常、菜单/唱片/普通声音、配置开关、卸载与重新挂载，以及注册失败后通过真实事件总线播放菜单音乐。测试范围见 [配置生命周期测试](tests/configload/README.md) 和 [功能覆盖测试](tests/overrides/README.md)。
+
 ## Northstar / Spelunkery 冰块兼容修复
 
 针对 `crash-2026-11-10_09.28.47-client.txt` 中的启动崩溃，涉及 Northstar 0.6.6+1.21.1 和 Spelunkery 1.21.1-0.4.4。
@@ -137,7 +148,7 @@ dependencyOverrides = { xaeros_playerposition = ["-xaerominimap", "+xaerominimap
 .\gradlew.bat build
 ```
 
-将 `build/libs/zinzincfix-1.0.7.jar` 放入整合包的 `mods` 文件夹，替换旧版 ZinZincFix，然后重启游戏。目录中只保留一个 ZinZincFix 版本。此版本包含上述兼容修复与性能补丁；使用 Northstar / Spelunkery、Simulated Coasters 或仪表取物兼容修复的专用服务端也应安装此补丁，客户端配置保护、制图台图标以及 AliveCombat 与 Subtle Effects 的优化仅在客户端应用。
+将 `build/libs/zinzincfix-1.0.8.jar` 放入整合包的 `mods` 文件夹，替换旧版 ZinZincFix，然后重启游戏。目录中只保留一个 ZinZincFix 版本。此版本包含上述兼容修复与性能补丁；使用 Northstar / Spelunkery、Simulated Coasters 或仪表取物兼容修复的专用服务端也应安装此补丁，客户端配置保护、制图台图标以及 AliveCombat 与 Subtle Effects 的优化仅在客户端应用。
 
 ## 游戏内复测
 
@@ -153,3 +164,4 @@ dependencyOverrides = { xaeros_playerposition = ["-xaerominimap", "+xaerominimap
 10. 打开铜桶及其他思索，检查播放、暂停、拖动进度、用户缩放和自由预览；缩放动画中检查方块高亮位置。此版本需要完全重启游戏才会生效。
 11. 在同一仪表方块的不同槽位安装 Deployer 自定义面板、Fluid Logistics 资源仪表和普通仪表，逐个中键取物；再切换激活状态并替换面板检查。
 12. 打开制图台，检查 Supplementaries 原有图标轮换和 Moonlight 注册的自定义图标都继续更新；有其他模组修改制图台时一起复测显示效果。
+13. 确认启动日志不再出现 Fluid Logistics 的 `@Overwrite is required` 错误；检查菜单音乐和纸板唱片机声音，退出世界后再次进入检查唱片机。

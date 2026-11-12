@@ -13,6 +13,8 @@
     "coroutil.CoroConfigRegistryMixin",
     "curios.GuiEventHandlerMixin",
     "forgeendertech.DevInfoMixin",
+    "createcardboardthings.ConfigAccessor",
+    "createcardboardthings.CardboardJukeboxEventsMixin",
     "alivecombat.PassHandlerMixin",
     "subtleeffects.FireflyManagerMixin",
     "subtleeffects.BiomeEffectsManagerMixin"

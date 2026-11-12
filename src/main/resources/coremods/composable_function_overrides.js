@@ -65,6 +65,27 @@ function initializeCoreMod() {
                 return inheritedHook(node, 'getCloneItemStack', pickDesc, Op.ACC_PUBLIC, 5, Op.ARETURN);
             }
         },
+        'fluid_logistics_explicit_pick_overwrite': {
+            'target': {'type': 'CLASS', 'name': 'com.yision.fluidlogistics.mixin.logistics.FactoryGaugeHostBlockMixin'},
+            'transformer': function (node) {
+                var method = methodNamed(node, 'getCloneItemStack', pickDesc);
+                if (method === null) return node;
+                var annotations = method.visibleAnnotations;
+                if (annotations !== null) {
+                    for (var i = 0; i < annotations.size(); i++) {
+                        if (annotations.get(i).desc === 'Lorg/spongepowered/asm/mixin/Overwrite;') return node;
+                    }
+                }
+                // The forwarding hook makes this an actual overwrite. Fluid Logistics
+                // requires the annotation, even though its original inherited override
+                // could be merged without one. Keep its method body and strict policy.
+                var annotation = method.visitAnnotation('Lorg/spongepowered/asm/mixin/Overwrite;', true);
+                annotation.visit('remap', false);
+                annotation.visitEnd();
+                ASMAPI.log('INFO', 'ZinZincFix: mark Fluid Logistics factory gauge picking as an explicit overwrite');
+                return node;
+            }
+        },
         'deployer_composable_pick': {
             'target': {'type': 'CLASS', 'name': 'net.liukrast.deployer.lib.mixin.FactoryPanelBlockMixin'},
             'transformer': function (node) {

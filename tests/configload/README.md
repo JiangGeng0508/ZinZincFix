@@ -10,7 +10,7 @@ $env:JAVA_HOME = 'C:\Program Files\Java\jdk-21'
 .\gradlew.bat --no-configuration-cache -I tests/configload/smoke.gradle -PconfigAbsent runClient runServer
 ```
 
-`configMods` 目录需要恰好各一份匹配的 TaCZ 1.2.0、AppleSkin 3.0.9、CoroUtil 1.21.0-1.3.9、Curios 9.5.1、ForgeEndertech 12.1.4.0 JAR。测试使用本次构建的 ZinZincFix 发布 JAR，而非以开发 source set 代替发布产物；目标模组的内嵌依赖由 NeoForge 加载。
+`configMods` 目录需要恰好各一份匹配的 TaCZ 1.2.0、AppleSkin 3.0.9、CoroUtil 1.21.0-1.3.9、Curios 9.5.1、ForgeEndertech 12.1.4.0 和 CreateCardboardThings 1.21.1-1.0.2 JAR。测试使用本次构建的 ZinZincFix 发布 JAR，而非以开发 source set 代替发布产物；前五个目标模组的内嵌依赖由 NeoForge 加载。CreateCardboardThings 仅提取原始 Config 和 sound 包类到测试模块，注册其真实 COMMON 配置，避免为了无世界声音回调测试加载完整 Create。
 
 ## 原始方法与补丁对照
 
@@ -22,20 +22,21 @@ $env:JAVA_HOME = 'C:\Program Files\Java\jdk-21'
 - 配置卸载：用真实 `ModConfigSpec.acceptConfig(null)` 解除配置，确认补丁跳过且不自行加载配置；重新挂载原对象后继续运行，不修改配置文件。
 - CoroUtil：构造期与 common setup 期间不消费首次初始化标记；配置就绪后，模拟加载完成状态并验证同步只初始化一次。
 - 非背包界面 / 无世界按键：配置未加载时跳过，配置就绪时与原方法效果一致。
+- CreateCardboardThings：原始 `onPlaySound` 在配置未加载时对 MUSIC / RECORDS / MASTER 三种声音均抛出配置异常；补丁保留声音对象与空的唱片机状态。配置开关两种取值下与原始回调对照，卸载时再次复现原始异常，重新挂载后恢复。
 
 正常对照在配置已加载的 common setup 阶段自动退出，未进入玩家世界或验证枪械实际交互。CoroUtil 的完成状态通过测试临时修改 `ClientModLoader.loading` 实现，测试后恢复。
 
 本次正常对照输出：
 
 ```text
-CONFIG PRESENT PASS: 408 checks against original mod bytecode
+CONFIG PRESENT PASS: 443 checks against original mod bytecode
 ```
 
 ## 注册失败与缺少模组
 
 `configFailure` 在物品注册事件中故意抛出 `CONFIG SMOKE: intentional registry failure`。预期会生成 FML 加载错误报告，这是测试输入，不是补丁失败。
 
-测试专用 Minecraft 帧 Mixin 等待实际 `LoadingErrorScreen`，随后启用真实 NeoForge 游戏事件总线，在渲染线程派发 5 次 `ClientTickEvent.Post`。NeoForge 默认以停止状态创建该总线，正常注册失败时不会启动；整合包中的 Placebo 9.9.4 构造函数会提前启用它，因此测试显式模拟此条件。要求 CoroUtil 初始化标记保留，TaCZ / AppleSkin 配置仍未加载，且无二次配置异常。
+测试专用 Minecraft 帧 Mixin 等待实际 `LoadingErrorScreen`，随后启用真实 NeoForge 游戏事件总线，在渲染线程派发 5 次 `ClientTickEvent.Post`，每次 tick 另派发 `PlaySoundEvent` 菜单音乐事件给原始纸板唱片机订阅类。NeoForge 默认以停止状态创建该总线，正常注册失败时不会启动；整合包中的 Placebo 9.9.4 构造函数会提前启用它，因此测试显式模拟此条件。要求 CoroUtil 初始化标记保留，TaCZ / AppleSkin 配置仍未加载，音乐对象保持不变，且无二次配置异常。
 
 成功标记：
 
