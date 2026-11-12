@@ -1,0 +1,46 @@
+// gradlew --no-configuration-cache -I tests/overrides/smoke.gradle -PoverrideMods=<mods> -PoverrideMode=both runClient
+allprojects {
+    afterEvaluate {
+        def mode = providers.gradleProperty('overrideMode').getOrElse('both')
+        def fixtures = file("build/override-smoke/fixtures-${mode}")
+        def prepareSources = sourceSets.create('overridePrepare') {
+            java.srcDir('tests/overrides/prepare')
+            compileClasspath += sourceSets.main.compileClasspath
+            runtimeClasspath = output + compileClasspath
+        }
+        def prepare = tasks.register('prepareOverrideFixtures', JavaExec) {
+            dependsOn tasks.named('overridePrepareClasses')
+            classpath = prepareSources.runtimeClasspath
+            mainClass = 'PrepareFixtures'
+            args file(providers.gradleProperty('overrideMods').get()).absolutePath, fixtures.absolutePath, mode
+            outputs.dir(fixtures)
+            // Also re-read originals after mod upgrades, including changes to method bodies.
+            inputs.files(fileTree(file(providers.gradleProperty('overrideMods').get())) { include '*.jar' })
+            inputs.property('mode', mode)
+        }
+        def fixtureJar = files(new File(fixtures, 'fixture.jar')).builtBy(prepare)
+        def checks = sourceSets.create('overrideSmoke') {
+            java.srcDir('tests/overrides/src')
+            resources.srcDirs('tests/overrides/resources', new File(fixtures, 'resources'))
+            compileClasspath += sourceSets.main.compileClasspath + fixtureJar
+            runtimeClasspath = output + configurations.runtimeClasspath
+        }
+        tasks.named(checks.processResourcesTaskName) {
+            dependsOn prepare
+            // Keep original helpers and their small adapters in one Java module.
+            from({ zipTree(new File(fixtures, 'fixture.jar')) }) { include '**/*.class' }
+        }
+        neoForge.mods.remove(neoForge.mods.getByName('zinzincfix'))
+        if (mode != 'baseline') dependencies.add('localRuntime', files(tasks.named('jar')))
+        neoForge.mods { override_smoke { sourceSet(checks) } }
+        ['client', 'server'].each { name ->
+            neoForge.runs.named(name) {
+                sourceSet = checks
+                gameDirectory = file("build/override-smoke/${mode}-${name}")
+                systemProperty 'mixin.debug.export', 'true'
+                systemProperty 'mixin.debug.countInjections', 'true'
+                systemProperty 'overrideSmoke.mode', mode
+            }
+        }
+    }
+}

@@ -18,9 +18,9 @@ def review(c):
     if pair == {'northstar.mixins.json', 'spelunkery-common.mixins.json'} and c['target'].endswith('.IceBlock'):
         return '已有修复：Northstar 优先级 Coremod'
     if pair == {'deployer.mixins.json', 'fluidlogistics.mixins.json'}:
-        return '确认功能覆盖：Deployer 克隆物品分支被跳过'
+        return '已修复：1.0.7 保留 Deployer 自定义面板取物和资源仪表回退'
     if pair == {'moonlight-common.mixins.json', 'supplementaries-common.mixins.json'}:
-        return '确认功能覆盖：Moonlight 槽位图标 tick 被跳过'
+        return '已修复：1.0.7 组合 Moonlight 与 Supplementaries 图标 tick'
     if pair <= {'lithium.mixins.json', 'modernfix-modernfix.mixins.json', 'saturn.mixins.json'} and c['target'].endswith(('.Biome', '.PalettedContainer', '$InputContainer', '$EmptyContainer', '$OutputContainer')):
         return '重复优化；部分成员有跳过日志'
     if pair == {'sable_sa_compat.mixins.json'}:

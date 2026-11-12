@@ -2,11 +2,17 @@
 
 日期：2026-11-12。目录：`E:\App\PCL\.minecraft\versions\Aeronautics`。
 
+后续更新：**1.0.7 已修复下文的 Deployer / Fluid Logistics 与 Moonlight / Supplementaries 两组功能覆盖**。之前的配置保护、思索修复、测试和原始排查报告已先提交为 `a6cec30`。具体实现和回归范围见 [功能覆盖兼容测试](../tests/overrides/README.md)。扫描统计仍是本报告原始快照，候选复核标签已更新。
+
+2026-11-12 18:09 已安装 `mods/zinzincfix-1.0.7.jar`，SHA-256 为 `552BBE8D386F7D62CFDFCB121FA00802238AD2D4AA76A953112A92773597DC6D`。旧 1.0.6 已备份到 `zinzincfix-backups/function-overrides-20261112-180940/zinzincfix-1.0.6.jar`，备份和安装文件均已校验。需要完全重启客户端；使用仪表取物兼容的专用服务端也应更新并重启。
+
+1.0.7 验证：未打补丁时复现两处功能丢失；修复后的客户端 194 项行为断言、服务端 168 项取物断言、思索回归 124 项数值断言通过；无目标模组的客户端/服务端加载和 Gradle `build` 通过。测试没有创建存档，完整整合包中的显示、玩家输入和网络流程仍需游戏内复测。
+
 ## 结果
 
 ZinZincFix **1.0.6** 修复了 Ponderer / Create Simulated 的思索缩放注入冲突，保留 1.0.5 的配置加载保护及此前修复。已完成整套安装目录的静态扫描和现有日志复核；这不等于实际游玩过每个模组的所有功能。
 
-日志中的问题归为 **9 组**：2 组致命注入问题（本次思索问题和已有补丁处理的 Northstar / Spelunkery），2 组尚未修复的功能覆盖问题，5 组重复优化、相同访问器或有意覆盖。没有在本次日志集合中发现第三组不同的致命 Mixin 注入错误。
+日志中的问题归为 **9 组**：2 组致命注入问题（思索问题和已有补丁处理的 Northstar / Spelunkery），2 组功能覆盖问题（后续由 1.0.7 修复），5 组重复优化、相同访问器或有意覆盖。没有在本次日志集合中发现第三组不同的致命 Mixin 注入错误。
 
 ## 本次修复
 
@@ -45,22 +51,22 @@ ZinZincFix **1.0.6** 修复了 Ponderer / Create Simulated 的思索缩放注入
 
 安装后需完全退出并重新启动游戏，再打开铜桶与其他物品的思索，检查播放、暂停、缩放、自由预览和方块高亮位置。已经运行的 JVM 不会自动取得 Coremod 修复。
 
-2026-11-12 17:01 已安装 `mods/zinzincfix-1.0.6.jar`，目录中只保留此版本。SHA-256：`7D4C1B380D9067D916F8515CCB649F60BF61438672F06E286C2B9CEC3F8DFA53`。旧 1.0.5 备份在 `zinzincfix-backups/ponder-mixin-20261112-170155/zinzincfix-1.0.5.jar`，已核对备份和新包哈希；其他模组 JAR 未改写。
+安装历史：2026-11-12 17:01 安装了 `mods/zinzincfix-1.0.6.jar`，现已升级为上文的 1.0.7。1.0.6 的 SHA-256：`7D4C1B380D9067D916F8515CCB649F60BF61438672F06E286C2B9CEC3F8DFA53`。旧 1.0.5 备份在 `zinzincfix-backups/ponder-mixin-20261112-170155/zinzincfix-1.0.5.jar`，已核对备份和新包哈希；其他模组 JAR 未改写。
 
 ## 日志中确认的其他问题
 
 | 组合 / 入口 | 复核结果 | 处理状态 |
 |---|---|---|
 | Northstar / Spelunkery：`IceBlock.melt` | 原先同优先级向被覆盖的方法注入，已由已有 Northstar 优先级 Coremod 处理 | 保留既有修复 |
-| **Deployer 0.1.3 / Fluid Logistics 1.3.2：`FactoryPanelBlock.getCloneItemStack`** | Deployer 的自定义面板取物逻辑被 Fluid Logistics 覆盖。后者最终调用 `FactoryGaugeDropPolicy.stackFor`，对非资源仪表行为返回普通 `FACTORY_GAUGE`；可能使 Deployer 自定义面板中键取物得到普通仪表 | **未修复；建议优先做双方分支兼容** |
-| **Moonlight 3.8.2 / Supplementaries 4.0.2：制图台 `containerTick`** | Supplementaries 的 tick 保留自己的图标轮换，但 Moonlight 的 `CartographyTableHelper` 自定义槽位图标 tick 被跳过。双方渲染注入仍存在 | **未修复；需合并图标更新，不能只换优先级** |
+| **Deployer 0.1.3 / Fluid Logistics 1.3.2：`FactoryPanelBlock.getCloneItemStack`** | Deployer 的自定义面板取物逻辑被 Fluid Logistics 覆盖。后者最终调用 `FactoryGaugeDropPolicy.stackFor`，对非资源仪表行为返回普通 `FACTORY_GAUGE`；可能使 Deployer 自定义面板中键取物得到普通仪表 | **1.0.7 已修复：Deployer 改为 HEAD 注入，仅自定义激活面板取消回调，其余继续原资源仪表逻辑** |
+| **Moonlight 3.8.2 / Supplementaries 4.0.2：制图台 `containerTick`** | Supplementaries 的 tick 保留自己的图标轮换，但 Moonlight 的 `CartographyTableHelper` 自定义槽位图标 tick 被跳过。双方渲染注入仍存在 | **1.0.7 已修复：Moonlight 改为 TAIL 注入，双方图标都更新，父类仅执行一次** |
 | ModernFix / Lithium / Saturn：`Biome.getTemperature` | ModernFix 实现获选，Lithium / Saturn 方法被跳过；属于温度缓存策略重复，不是本次崩溃链 | 未改动；避免把优化收益相加 |
 | Lithium / Saturn：堆肥桶 `getSlotsForFace` | Input / Empty 容器有跳过日志；原字节码都是返回固定槽位数组，属重复分配优化 | 未改动 |
 | Lithium / Saturn：`PalettedContainer.acquire/release` | 双方都去掉线程检测的相同入口，Lithium 获选，Saturn 被跳过 | 未改动；这不证明整套异步区块实现线程安全 |
 | BetterF3 / Sable：`ClientChunkCache.Storage.getChunks` | BetterF3 返回 `chunks`，Sable 是同字段访问器，方法名碰撞但读取对象一致 | 未改动 |
 | Sable SA Compat 1.0.4：抓钩链条常量 | `dontGet` / `dontGet2` 保留 ordinal 19 / 9 的 `0.5`，广泛匹配的 `get` 将其他 `0.5` 改成 `0`。两条冲突告警是该写法的有意排除，不是两模组争抢 | 未改动；不应直接删掉两个“冲突”方法 |
 
-这两组剩余功能覆盖不会因为本次思索修复而消失。本次授权中的“修复此处”落实为思索兼容补丁；其他已确认行为差异列出具体影响，未批量禁用模组或优化配置。
+这两组功能覆盖在 1.0.6 的思索修复后仍然存在，已按后续要求在 1.0.7 独立修复。两个目标原本只有继承方法，补丁在缺少具体方法时补上等价父类转发入口，使单独安装任何一方也有效。没有批量禁用模组或优化配置。
 
 ## 全量扫描范围与结果
 

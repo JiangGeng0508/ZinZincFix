@@ -31,7 +31,7 @@ authors="zinzinc"
 
 # The description text for the mod (multi line!) (#mandatory)
 description='''
-Compatibility fixes for the ZinZinc modpack. Fixes Create Grappling Hooks model loading, premature client config access in Wakes, TaCZ, AppleSkin, CoroUtil, Curios and ForgeEndertech, the Northstar/Spelunkery ice mixin conflict, and Ponderer/Create Simulated Ponder scaling. Skips irrelevant chunk sections during Simulated Coasters bearing scans. Caches AliveCombat interaction method checks and reduces redundant Subtle Effects biome queries.
+Compatibility fixes for the ZinZinc modpack. Fixes Create Grappling Hooks model loading, premature client config access in Wakes, TaCZ, AppleSkin, CoroUtil, Curios and ForgeEndertech, the Northstar/Spelunkery ice mixin conflict, Ponderer/Create Simulated Ponder scaling, Deployer/Fluid Logistics panel picking, and Moonlight/Supplementaries cartography icon ticks. Skips irrelevant chunk sections during Simulated Coasters bearing scans. Caches AliveCombat interaction method checks and reduces redundant Subtle Effects biome queries.
 '''
 
 # The [[mixins]] block allows you to declare your mixin config to FML so that it gets loaded.

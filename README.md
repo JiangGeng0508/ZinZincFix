@@ -62,7 +62,23 @@ Spelunkery 的 `IceMixin` 以优先级 1000 替换了 `IceBlock.melt()`；Norths
 
 仅存在对应目标类时转换；单独安装任一模组也可使用，无新增前置。当前验证版本为 Ponder 1.0.82、Ponderer 1.11.0、Simulated 1.3.2；升级后需重新验证字节码结构。
 
-已使用原始场景与双方 Mixin 字节码复现冲突，并验证组合缩放、缩放覆盖、冻结预览、鼠标反算，以及单模组和无模组环境。测试范围见 [思索兼容测试](tests/ponder/README.md)。整合包 Mixin 扫描结果见 [全量排查报告](docs/mixin-conflict-audit-2026-11-12.zh-CN.md)，其中另有两组尚未修复的功能覆盖问题。
+已使用原始场景与双方 Mixin 字节码复现冲突，并验证组合缩放、缩放覆盖、冻结预览、鼠标反算，以及单模组和无模组环境。测试范围见 [思索兼容测试](tests/ponder/README.md)。整合包 Mixin 扫描结果见 [全量排查报告](docs/mixin-conflict-audit-2026-11-12.zh-CN.md)，其中的两组功能覆盖问题已在 1.0.7 修复。
+
+## Deployer / Fluid Logistics 仪表取物兼容
+
+1.0.7 修复 Deployer 0.1.3 的 `FactoryPanelBlock.getCloneItemStack` 被 Fluid Logistics 1.3.2 覆盖的问题。Deployer 自定义面板的中键取物原本可能返回普通仪表。
+
+Coremod 将 Deployer 的隐式方法覆盖改成可取消的 HEAD 注入：命中激活的 `AbstractPanelBehaviour` 时返回其原有 `getItem()` 结果；其余情况继续执行 Fluid Logistics 的资源仪表取物和回退逻辑。原方法的局部变量同步后移，避免占用新增回调参数的位置。
+
+Create 6.0.10 的该五参数方法来自父类，Mixin 不能直接向继承方法注入，因此补丁在 `FactoryPanelBlock` 缺少此方法时补上等价的父类转发入口。已有具体实现时不添加。单独安装 Deployer、Fluid Logistics 或两者都不安装时也保留对应行为。此修复适用于客户端和服务端。
+
+## Moonlight / Supplementaries 制图台图标兼容
+
+1.0.7 修复 Moonlight 3.8.2 的 `containerTick` 被 Supplementaries 4.0.2 覆盖的问题，恢复通过 `CartographyTableHelper.addSlotIcon` 注册的自定义槽位图标轮换。
+
+Coremod 将 Moonlight 的隐式覆盖改成 TAIL 注入，保留 `hasCustomIcons()` 条件和原来的两个槽位更新；Supplementaries 的图标更新仍在原方法中执行。Moonlight 注入不再重复调用父类。若原版制图台只有继承的 `containerTick`，补上等价父类转发入口以支持单独安装 Moonlight。
+
+两处补丁不改写原模组 JAR、不新增前置，也不调整双方优先级。原始覆盖方法及相关辅助方法的回归测试见 [功能覆盖兼容测试](tests/overrides/README.md)。
 
 ## Xaero 玩家位置模组依赖版本修复
 
@@ -121,7 +137,7 @@ dependencyOverrides = { xaeros_playerposition = ["-xaerominimap", "+xaerominimap
 .\gradlew.bat build
 ```
 
-将 `build/libs/zinzincfix-1.0.6.jar` 放入整合包的 `mods` 文件夹，替换旧版 ZinZincFix，然后重启游戏。目录中只保留一个 ZinZincFix 版本。此版本包含上述兼容修复与性能补丁；使用 Northstar / Spelunkery 或 Simulated Coasters 的专用服务端也应安装此补丁，客户端配置保护以及 AliveCombat 与 Subtle Effects 的优化仅在客户端应用。
+将 `build/libs/zinzincfix-1.0.7.jar` 放入整合包的 `mods` 文件夹，替换旧版 ZinZincFix，然后重启游戏。目录中只保留一个 ZinZincFix 版本。此版本包含上述兼容修复与性能补丁；使用 Northstar / Spelunkery、Simulated Coasters 或仪表取物兼容修复的专用服务端也应安装此补丁，客户端配置保护、制图台图标以及 AliveCombat 与 Subtle Effects 的优化仅在客户端应用。
 
 ## 游戏内复测
 
@@ -135,3 +151,5 @@ dependencyOverrides = { xaeros_playerposition = ["-xaerominimap", "+xaerominimap
 8. 在白天、夜晚、洞穴及有方块光源的位置检查萤火虫，在花林等群系检查粒子；切换配置、世界与维度后再次确认，并用相同路线录制帧时间与 JFR 分配采样。
 9. 启动后检查 TaCZ 按住 / 切换瞄准和趴下、键盘与手柄输入，AppleSkin 食物闪烁，Curios 生存 / 创造背包按钮，以及 ForgeEndertech 调试快捷键。若仍有加载失败，优先检查日志中的原始注册错误。
 10. 打开铜桶及其他思索，检查播放、暂停、拖动进度、用户缩放和自由预览；缩放动画中检查方块高亮位置。此版本需要完全重启游戏才会生效。
+11. 在同一仪表方块的不同槽位安装 Deployer 自定义面板、Fluid Logistics 资源仪表和普通仪表，逐个中键取物；再切换激活状态并替换面板检查。
+12. 打开制图台，检查 Supplementaries 原有图标轮换和 Moonlight 注册的自定义图标都继续更新；有其他模组修改制图台时一起复测显示效果。
