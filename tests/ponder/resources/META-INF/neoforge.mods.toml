@@ -1,0 +1,11 @@
+modLoader="javafml"
+loaderVersion="[4,)"
+license="All Rights Reserved"
+[[mods]]
+modId="ponder_smoke"
+version="1.0"
+displayName="Disposable Ponder compatibility checks"
+[[mixins]]
+config="ponderer.mixins.json"
+[[mixins]]
+config="simulated.mixins.json"

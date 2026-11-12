@@ -1,0 +1,29 @@
+// python tests/ponder/prepare.py <installed-mods> build/ponder-smoke/fixtures <both|baseline|ponderer|simulated|absent>
+// gradlew --no-configuration-cache -I tests/ponder/smoke.gradle -PponderMode=both runClient
+allprojects {
+    afterEvaluate {
+        def mode = providers.gradleProperty('ponderMode').getOrElse('both')
+        def fixtures = file('build/ponder-smoke/fixtures')
+        def checks = sourceSets.create('ponderSmoke') {
+            java.srcDir('tests/ponder/src')
+            resources.srcDirs('tests/ponder/resources', new File(fixtures, 'resources'))
+            compileClasspath += sourceSets.main.compileClasspath + files(
+                new File(fixtures, 'ponder-original.jar'), new File(fixtures, 'ponderer-original.jar'),
+                new File(fixtures, 'simulated-original.jar'))
+            runtimeClasspath = output + configurations.runtimeClasspath
+        }
+        dependencies.add('localRuntime', files(new File(fixtures, 'fixture.jar')))
+        neoForge.mods.remove(neoForge.mods.getByName('zinzincfix'))
+        if (mode != 'baseline') dependencies.add('localRuntime', files(tasks.named('jar')))
+        neoForge.mods { ponder_smoke { sourceSet(checks) } }
+        ['client', 'server'].each { name ->
+            neoForge.runs.named(name) {
+                sourceSet = checks
+                gameDirectory = file("build/ponder-smoke/${mode}-${name}")
+                systemProperty 'mixin.debug.export', 'true'
+                systemProperty 'mixin.debug.countInjections', 'true'
+                systemProperty 'ponderSmoke.mode', mode
+            }
+        }
+    }
+}

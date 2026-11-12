@@ -1,0 +1,19 @@
+// gradlew --no-configuration-cache -I tests/mixinaudit/audit.gradle -PmixinMods=<mods> mixinAudit
+allprojects {
+    afterEvaluate {
+        def audit = sourceSets.create('mixinAudit') {
+            java.srcDir('tests/mixinaudit/src')
+            compileClasspath += sourceSets.main.compileClasspath
+            runtimeClasspath = output + compileClasspath
+        }
+        tasks.register('mixinAudit', JavaExec) {
+            dependsOn tasks.named('mixinAuditClasses')
+            classpath = audit.runtimeClasspath
+            mainClass = 'MixinAudit'
+            maxHeapSize = '2G'
+            args file(providers.gradleProperty('mixinMods').get()).absolutePath,
+                    file('build/mixin-audit/inventory.json').absolutePath,
+                    file('build/mixin-audit/log-review.json').absolutePath
+        }
+    }
+}

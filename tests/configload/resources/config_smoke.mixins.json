@@ -1,0 +1,7 @@
+{
+  "required": true,
+  "package": "com.zinzinc.configsmoke.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "client": ["MinecraftFrameMixin"],
+  "injectors": {"defaultRequire": 1}
+}

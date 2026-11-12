@@ -1,0 +1,34 @@
+modLoader="javafml"
+loaderVersion="[4,)"
+license="All Rights Reserved"
+[[mods]]
+modId="config_smoke"
+version="1"
+displayName="Configuration lifecycle regression verification"
+[[mixins]]
+config="config_smoke.mixins.json"
+[[dependencies.config_smoke]]
+modId="curios"
+type="optional"
+ordering="AFTER"
+side="BOTH"
+[[dependencies.config_smoke]]
+modId="forgeendertech"
+type="optional"
+ordering="AFTER"
+side="BOTH"
+[[dependencies.config_smoke]]
+modId="coroutil"
+type="optional"
+ordering="AFTER"
+side="BOTH"
+[[dependencies.config_smoke]]
+modId="tacz"
+type="optional"
+ordering="AFTER"
+side="BOTH"
+[[dependencies.config_smoke]]
+modId="appleskin"
+type="optional"
+ordering="AFTER"
+side="BOTH"

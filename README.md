@@ -28,6 +28,22 @@ addon_gancho:item/plunger_launcher/spool_joint
 
 补丁仅在 `WakesConfig.CLIENT_SPEC.isLoaded()` 为假时跳过 Wakes 的客户端 tick；配置就绪后继续执行原始逻辑，包括进入世界时初始化水波、退出世界时清理实例。Mixin 仅在客户端应用，未安装 Wakes 时自动跳过。
 
+## 客户端配置未加载时的回调保护
+
+针对 `crash-2026-11-12_15.02.25-client.txt`，1.0.5 修复 TaCZ 1.2.0 在客户端 tick 中无条件读取趴下 / 瞄准配置的问题，并修复排查中确认的四个模组入口：
+
+- TaCZ：客户端配置为空或尚未加载时，跳过趴下、瞄准 tick，并清除对应手柄按下状态。
+- AppleSkin 3.0.9：配置加载前跳过 HUD 闪烁动画 tick。
+- CoroUtil 1.21.0-1.3.9：在正常模组加载结束前保留首次配置同步标记；加载失败时不提前消费该标记。
+- Curios 9.5.1：先判断是否为生存 / 创造背包界面，再读取按钮配置，避免加载错误界面触发读取。
+- ForgeEndertech 12.1.4.0：先判断世界是否存在，再读取调试快捷键配置。
+
+所有修复仅在客户端应用，未安装对应模组时自动跳过；配置就绪后执行原有逻辑。没有全局吞异常或把未加载配置替换为默认值，也不需要新增运行时前置。
+
+此次原始启动失败是 Create 6.0.10 注册进度时访问未绑定的 `create:chocolate_bucket`，导致后续 CLIENT / COMMON 配置没有加载。上述补丁修复之后的配置异常，**不代表 Create 的注册错误已修复**。
+
+已扫描整合包的 352 个顶层 JAR 及内嵌依赖（总计 590 个 JAR），并复核 tick、界面、输入和静态初始化候选。结果和仍需关注的路径见 [配置加载排查报告](docs/config-loading-audit-2026-11-12.zh-CN.md)，实际字节码对照测试及验证边界见 [配置生命周期测试](tests/configload/README.md)。
+
 ## Northstar / Spelunkery 冰块兼容修复
 
 针对 `crash-2026-11-10_09.28.47-client.txt` 中的启动崩溃，涉及 Northstar 0.6.6+1.21.1 和 Spelunkery 1.21.1-0.4.4。
@@ -37,6 +53,16 @@ Spelunkery 的 `IceMixin` 以优先级 1000 替换了 `IceBlock.melt()`；Norths
 补丁通过 NeoForge 自带的 Coremod，在 Mixin 读取 Northstar 的 `IceBlockMixin` 前，将该类默认的 1000 优先级调整为 1100。保留 Northstar 的温度、密封和破冰逻辑，以及 Spelunkery 的盐块融冰逻辑；无需新增前置，也不修改原模组 JAR。若该类已有非 1000 的显式优先级，则保持不变。
 
 此修复适用于客户端和服务端。未安装 Northstar 时没有转换目标；单独安装 Northstar 时也只调整此类的优先级。
+
+## Ponderer / Create Simulated 思索缩放兼容
+
+1.0.6 修复 Ponderer 1.11.0 与 Create Simulated 1.3.2 同时安装时，首次打开铜桶等物品思索触发的 `interpolateScaleFactor (0/1) succeeded` 崩溃。双方原本都独占重定向 `PonderScene.scaleFactor` 的读取。
+
+补丁通过 NeoForge Coremod 将 Ponderer 的缩放 `@Redirect` 转换为 `@ModifyExpressionValue`：接收 Simulated 插值后的结果，再执行原有的缩放覆盖与用户缩放；原来的自由预览、旋转、平移和视图偏移代码保留。同时让 Simulated 在 `screenToScene` 中也使用动画缩放，使绘制与鼠标反算使用相同的比例。没有降低注入成功次数要求，也不依赖修改原模组 JAR。
+
+仅存在对应目标类时转换；单独安装任一模组也可使用，无新增前置。当前验证版本为 Ponder 1.0.82、Ponderer 1.11.0、Simulated 1.3.2；升级后需重新验证字节码结构。
+
+已使用原始场景与双方 Mixin 字节码复现冲突，并验证组合缩放、缩放覆盖、冻结预览、鼠标反算，以及单模组和无模组环境。测试范围见 [思索兼容测试](tests/ponder/README.md)。整合包 Mixin 扫描结果见 [全量排查报告](docs/mixin-conflict-audit-2026-11-12.zh-CN.md)，其中另有两组尚未修复的功能覆盖问题。
 
 ## Xaero 玩家位置模组依赖版本修复
 
@@ -95,7 +121,7 @@ dependencyOverrides = { xaeros_playerposition = ["-xaerominimap", "+xaerominimap
 .\gradlew.bat build
 ```
 
-将 `build/libs/zinzincfix-1.0.4.jar` 放入整合包的 `mods` 文件夹，替换旧版 ZinZincFix，然后重启游戏。目录中只保留一个 ZinZincFix 版本。此版本包含上述兼容修复与性能补丁；使用 Northstar / Spelunkery 或 Simulated Coasters 的专用服务端也应安装此补丁，AliveCombat 与 Subtle Effects 的优化仅在客户端应用。
+将 `build/libs/zinzincfix-1.0.6.jar` 放入整合包的 `mods` 文件夹，替换旧版 ZinZincFix，然后重启游戏。目录中只保留一个 ZinZincFix 版本。此版本包含上述兼容修复与性能补丁；使用 Northstar / Spelunkery 或 Simulated Coasters 的专用服务端也应安装此补丁，客户端配置保护以及 AliveCombat 与 Subtle Effects 的优化仅在客户端应用。
 
 ## 游戏内复测
 
@@ -107,3 +133,5 @@ dependencyOverrides = { xaeros_playerposition = ["-xaerominimap", "+xaerominimap
 6. 使用相同船体、实体数量与位置，对比 Simulated Coasters 的 tick 耗时；检查 coaster cart / rivet 的放置、拆除、重复限制、组装和解体行为，确认不会漏检目标方块。
 7. 检查 AliveCombat 准星拾取、穿过无碰撞方块的攻击、可交互方块及主副手工具的交互判断，与原版行为一致。
 8. 在白天、夜晚、洞穴及有方块光源的位置检查萤火虫，在花林等群系检查粒子；切换配置、世界与维度后再次确认，并用相同路线录制帧时间与 JFR 分配采样。
+9. 启动后检查 TaCZ 按住 / 切换瞄准和趴下、键盘与手柄输入，AppleSkin 食物闪烁，Curios 生存 / 创造背包按钮，以及 ForgeEndertech 调试快捷键。若仍有加载失败，优先检查日志中的原始注册错误。
+10. 打开铜桶及其他思索，检查播放、暂停、拖动进度、用户缩放和自由预览；缩放动画中检查方块高亮位置。此版本需要完全重启游戏才会生效。

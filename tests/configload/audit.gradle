@@ -1,0 +1,18 @@
+// --no-configuration-cache -I tests/configload/audit.gradle -PconfigMods=/path/to/mods configAudit
+allprojects {
+    afterEvaluate {
+        def auditSources = sourceSets.create('configAudit') {
+            java.srcDir('tests/configload/audit')
+            compileClasspath += sourceSets.main.compileClasspath
+            runtimeClasspath = output + compileClasspath
+        }
+        tasks.register('configAudit', JavaExec) {
+            dependsOn tasks.named('configAuditClasses')
+            classpath = auditSources.runtimeClasspath
+            mainClass = 'ConfigReadAudit'
+            maxHeapSize = '2G'
+            args file(providers.gradleProperty('configMods').get()).absolutePath,
+                    file('build/config-audit/candidates.json').absolutePath
+        }
+    }
+}

@@ -5,6 +5,14 @@
   "compatibilityLevel": "JAVA_21",
   "client": [
     "wakes.WakeClientTickerMixin",
+    "tacz.ClientConfigAccessor",
+    "tacz.CrawlKeyMixin",
+    "tacz.AimKeyMixin",
+    "appleskin.ModConfigAccessor",
+    "appleskin.HUDOverlayHandlerMixin",
+    "coroutil.CoroConfigRegistryMixin",
+    "curios.GuiEventHandlerMixin",
+    "forgeendertech.DevInfoMixin",
     "alivecombat.PassHandlerMixin",
     "subtleeffects.FireflyManagerMixin",
     "subtleeffects.BiomeEffectsManagerMixin"

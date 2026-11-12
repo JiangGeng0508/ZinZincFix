@@ -1,3 +1,4 @@
 {
-  "northstar_ice_priority": "coremods/northstar_ice_priority.js"
+  "northstar_ice_priority": "coremods/northstar_ice_priority.js",
+  "ponder_scale_compat": "coremods/ponder_scale_compat.js"
 }

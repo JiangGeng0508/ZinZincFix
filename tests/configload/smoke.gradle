@@ -1,0 +1,71 @@
+// --no-configuration-cache -I tests/configload/smoke.gradle
+// -PconfigMods=/path/to/mods runClient (or -PconfigAbsent runClient/runServer)
+allprojects {
+    afterEvaluate {
+        def absent = providers.gradleProperty('configAbsent').isPresent()
+        def failure = providers.gradleProperty('configFailure').isPresent()
+        def checks = sourceSets.create('configSmoke') {
+            java.srcDir('tests/configload/src')
+            resources.srcDir('tests/configload/resources')
+            compileClasspath += sourceSets.main.compileClasspath + sourceSets.main.output
+            runtimeClasspath = output + configurations.runtimeClasspath
+        }
+        def targets = [:]
+        if (!absent) {
+            def mods = file(providers.gradleProperty('configMods').get())
+            ['tacz': 'tacz-neoforge-*.jar', 'coroutil': 'coroutil-*.jar', 'appleskin': 'appleskin-*.jar',
+             'curios': 'curios-neoforge-*.jar', 'forgeendertech': 'ForgeEndertech-*.jar'].each { name, pattern ->
+                def candidates = fileTree(mods) { include pattern }.files
+                if (candidates.size() != 1) throw new GradleException("Expected one ${pattern} in ${mods}")
+                targets[name] = candidates.first()
+            }
+            // Curios 9.5.1's unrelated loot mixin fails against the development
+            // mappings. Exclude only that mixin in a test copy; GUI/config classes
+            // and the baseline jar remain byte-for-byte original.
+            def originalCurios = targets.curios
+            def curatedCurios = layout.buildDirectory.file('config-smoke/fixtures/curios.jar')
+            def prepareCurios = tasks.register('prepareConfigSmokeCurios') {
+                inputs.file(originalCurios)
+                outputs.file(curatedCurios)
+                doLast {
+                    def out = curatedCurios.get().asFile
+                    out.parentFile.mkdirs()
+                    new java.util.zip.ZipFile(originalCurios).withCloseable { input ->
+                        new java.util.zip.ZipOutputStream(new FileOutputStream(out)).withCloseable { output ->
+                            input.entries().each { entry ->
+                                if (!entry.directory) {
+                                    def bytes = input.getInputStream(entry).bytes
+                                    if (entry.name == 'curios.neoforge.mixins.json') {
+                                        def json = new groovy.json.JsonSlurper().parse(bytes)
+                                        if (!json.mixins.remove('MixinEnchantedCountIncreaseFunction'))
+                                            throw new GradleException('Expected Curios loot mixin was not found')
+                                        bytes = groovy.json.JsonOutput.toJson(json).getBytes('UTF-8')
+                                    }
+                                    output.putNextEntry(new java.util.zip.ZipEntry(entry.name))
+                                    output.write(bytes)
+                                    output.closeEntry()
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            dependencies.add('localRuntime', files(targets.findAll { key, value -> key != 'curios' }.values()))
+            dependencies.add('localRuntime', files(prepareCurios))
+        }
+        neoForge.mods.remove(neoForge.mods.getByName('zinzincfix'))
+        dependencies.add('localRuntime', files(tasks.named('jar')))
+        neoForge.mods { config_smoke { sourceSet(checks) } }
+        ['client', 'server'].each { name ->
+            neoForge.runs.named(name) {
+                sourceSet = checks
+                gameDirectory = file("build/config-smoke/${absent ? 'absent' : failure ? 'failure' : 'present'}-${name}")
+                systemProperty 'mixin.debug.export', 'true'
+                systemProperty 'mixin.debug.countInjections', 'true'
+                systemProperty 'configSmoke.absent', absent.toString()
+                systemProperty 'configSmoke.failure', failure.toString()
+                targets.each { key, value -> systemProperty "configSmoke.${key}Jar", value.absolutePath }
+            }
+        }
+    }
+}
